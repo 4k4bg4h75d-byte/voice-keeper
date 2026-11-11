@@ -1,0 +1,45 @@
+import os
+import asyncio
+import discord
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+CHANNEL_ID = int(os.getenv("VOICE_CHANNEL_ID", "0"))
+
+class VoiceBot(discord.Client):
+    async def setup_hook(self):
+        self.voice_task = asyncio.create_task(self.keep_connected())
+
+    async def keep_connected(self):
+        await self.wait_until_ready()
+
+        while not self.is_closed():
+            try:
+                channel = await self.fetch_channel(CHANNEL_ID)
+
+                if isinstance(channel, discord.VoiceChannel):
+                    voice = discord.utils.get(
+                        self.voice_clients,
+                        guild=channel.guild
+                    )
+
+                    if not voice or not voice.is_connected():
+                        await channel.connect(reconnect=True)
+
+                    elif voice.channel.id != CHANNEL_ID:
+                        await voice.move_to(channel)
+
+            except Exception as error:
+                print("Connection error:", error)
+
+            await asyncio.sleep(30)
+
+    async def on_ready(self):
+        print(f"Logged in as {self.user}")
+
+intents = discord.Intents.default()
+client = VoiceBot(intents=intents)
+
+if not TOKEN or not CHANNEL_ID:
+    raise ValueError("Missing environment variables")
+
+client.run(TOKEN)
